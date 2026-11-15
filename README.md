@@ -54,6 +54,8 @@ Yapmadan önce:
 - Orijinalleri hollow_knight_Data/.tr-dil-paketi-yedek/ altına alır.
   Oyun sonradan güncellenmişse (dosyalar değişmişse) yedeği yeniler;
   böylece KALDIR eski sürümün dosyalarını yeni sürümün üstüne yazmaz.
+  Yazma sırasında bir hata olursa, o ana kadar yazılan dosyaları yedekten geri alır;
+  oyun yarım yamalı kalmaz.
 
 --------------------------------------------------------------------
 NOTLAR

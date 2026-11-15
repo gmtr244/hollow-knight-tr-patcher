@@ -216,39 +216,33 @@ def arac_yolu():
     return None
 
 
-def onceki_kayit(yedek):
-    """Onceki kurulumun yazdigi tr-yama.json icindeki md5 kayitlari (yoksa bos)."""
-    try:
-        with open(os.path.join(yedek, "tr-yama.json"), encoding="utf-8") as fh:
-            m = json.load(fh).get("md5", {})
-        return m if isinstance(m, dict) else {}
-    except (OSError, ValueError):
-        return {}
+def yedekle(yol, yedek_yol, yamali):
+    """Orijinal (TR icermeyen) dosyayi yedekler.
 
-
-def yedekle(yol, yedek_yol, yamali_md5):
-    """Orijinal dosyayi yedekler.
-
-    Yedek yoksa alinir. Yedek varsa, dosya ne bizim yamali halimiz ne de yedegin
-    kendisi ise (Steam guncellemesi/dogrulamasi sonrasi gibi) yedek bayattir:
-    yenilenir; boylece KALDIR eski surumun dosyalarini yeni surumun ustune yazmaz.
-    Onceki kayit yoksa (eski kurulum) yedege dokunulmaz.
+    Kural dosyanin KENDISINE bakar, kayitlara degil:
+    - Dosyada TR yamasi varsa yedege ASLA yazilmaz (yedek orijinalin kalmali).
+      Yedek de yoksa uyari verilir: orijinal bu klasorde yok.
+    - Dosya yamali degilse ve yedek yoksa ya da yedekten farkliysa (Steam guncellemesi
+      sonrasi gibi) yedek yenilenir; boylece KALDIR eski surumun dosyalarini yeni
+      surumun ustune yazmaz.
     Donus: yazdirilacak mesaj ya da None.
     """
-    if not os.path.exists(yedek_yol):
+    var = os.path.exists(yedek_yol)
+    if yamali:
+        if var:
+            return None
+        return "UYARI: dosyada TR yamasi var ama orijinal yedegi yok; yedeklenmedi"
+    if not var:
         os.makedirs(os.path.dirname(yedek_yol), exist_ok=True)
         shutil.copy2(yol, yedek_yol)
         return "yedeklendi"
-    if yamali_md5 is None:
-        return None
-    simdiki = md5(yol)
-    if simdiki == yamali_md5 or simdiki == md5(yedek_yol):
+    if md5(yol) == md5(yedek_yol):
         return None
     shutil.copy2(yol, yedek_yol)
     return "yedek yenilendi (oyun dosyasi degismis)"
 
 
-def dll_yamala(veri, yedek, onceki):
+def dll_yamala(veri, yedek):
     """SupportedLanguages enum'ina TR ekler. Arac yoksa uyari verip devam eder."""
     dll = os.path.join(veri, "Managed", "Assembly-CSharp.dll")
     if not os.path.isfile(dll):
@@ -264,6 +258,10 @@ def dll_yamala(veri, yedek, onceki):
         except OSError:
             pass
 
+    yedek_dll = os.path.join(yedek, "Managed", "Assembly-CSharp.dll")
+    on = subprocess.run([arac, "--check", dll], capture_output=True, text=True)
+    dll_yamali = on.returncode == 0          # DLL'de TR zaten var mi?
+
     cikti = dll + ".tr-yeni"
     r = subprocess.run([arac, dll, cikti], capture_output=True, text=True)
     print("  " + (r.stdout or r.stderr).strip().replace("\n", "\n  "))
@@ -272,6 +270,9 @@ def dll_yamala(veri, yedek, onceki):
         # Basari saymadan once gercekten TR iceriyor mu diye dogrula.
         k = subprocess.run([arac, "--check", dll], capture_output=True, text=True)
         if k.returncode == 0:
+            mesaj = yedekle(dll, yedek_dll, True)
+            if mesaj:
+                print(f"  {mesaj}: {DLL_ANAHTAR}")
             return True
         print("  ! DLL'de TR dil kodu dogrulanamadi.")
         return False
@@ -285,8 +286,7 @@ def dll_yamala(veri, yedek, onceki):
         os.remove(cikti)
         print("  ! DLL dogrulanamadi; eski DLL korundu.")
         return False
-    yedek_dll = os.path.join(yedek, "Managed", "Assembly-CSharp.dll")
-    mesaj = yedekle(dll, yedek_dll, onceki.get(DLL_ANAHTAR))
+    mesaj = yedekle(dll, yedek_dll, dll_yamali)
     if mesaj:
         print(f"  {mesaj}: {DLL_ANAHTAR}")
     if not yeniden_adlandir(cikti, dll):
@@ -435,12 +435,14 @@ def tr_uygula(veri, dry_run, zorla=False):
     print(f"resources.assets -> m_FileID {dosya_id}")
 
     eklenen = silinen = 0
+    ggm_yamali = False
     gecerli = set(tr_id.values())
     for obj in genv.objects:
         if obj.type.name != "ResourceManager":
             continue
         t = obj.read_typetree()
         kap = t["m_Container"]
+        ggm_yamali = any(str(k[0]).lower().startswith("languages/tr_") for k in kap)
         yeni_kap = []
         for kayit in kap:
             ad = str(kayit[0])
@@ -474,16 +476,34 @@ def tr_uygula(veri, dry_run, zorla=False):
     # 5) yedek + atomik yaz
     yedek = os.path.join(veri, YEDEK_AD)
     os.makedirs(yedek, exist_ok=True)
-    onceki = onceki_kayit(yedek)
+    yamali_mi = {"resources.assets": bool(mevcut), "globalgamemanagers": ggm_yamali}
     for ad in DOSYALAR:
-        mesaj = yedekle(os.path.join(veri, ad), os.path.join(yedek, ad), onceki.get(ad))
+        mesaj = yedekle(os.path.join(veri, ad), os.path.join(yedek, ad), yamali_mi[ad])
         if mesaj:
             print(f"  {mesaj}: {ad}")
-    for ad in DOSYALAR:
-        atomik_yaz(os.path.join(gecici, ad), os.path.join(veri, ad))
-        print(f"  yazildi: {ad}  ({os.path.getsize(os.path.join(veri, ad))} bayt)")
+    yazilan = []
+    try:
+        for ad in DOSYALAR:
+            atomik_yaz(os.path.join(gecici, ad), os.path.join(veri, ad))
+            yazilan.append(ad)
+            print(f"  yazildi: {ad}  ({os.path.getsize(os.path.join(veri, ad))} bayt)")
+    except BaseException:
+        # yarim kalan yazma: iki dosya birbiriyle uyumsuz kalmasin, yedekten geri al
+        print("HATA: yazma sirasinda sorun; yazilan dosyalar yedekten geri aliniyor...")
+        for ad in yazilan:
+            kaynak = os.path.join(yedek, ad)
+            try:
+                if os.path.isfile(kaynak):
+                    atomik_yaz(kaynak, os.path.join(veri, ad))
+                    print(f"  geri alindi: {ad}")
+                else:
+                    print(f"  ! yedek yok, geri alinamadi: {ad} (KALDIR'i deneyin)")
+            except BaseException:
+                print(f"  ! geri alinamadi: {ad} (KALDIR'i deneyin)")
+        shutil.rmtree(gecici, ignore_errors=True)
+        raise
 
-    dll_ok = dll_yamala(veri, yedek, onceki)
+    dll_ok = dll_yamala(veri, yedek)
 
     md5ler = {ad: md5(os.path.join(veri, ad)) for ad in DOSYALAR}
     if dll_ok:
