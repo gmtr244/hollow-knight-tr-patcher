@@ -82,7 +82,7 @@ patcher/tr-veri/ ............ Türkçe metinler (şifreli bloklar)
 enumpatch/enumpatch[.exe] ... dil listesi aracı (Mono.Cecil)
 python/ ..................... Windows için gömülü Python (Windows sürümü)
 
-Çeviri topluluk çevirisidir; Hollow Knight ve dosya biçimleri
+Çeviri Project Gamers'a aittir; Hollow Knight ve dosya biçimleri
 Team Cherry'ye aittir.
 
 ## Depo yapısı
