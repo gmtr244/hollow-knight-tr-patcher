@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-2.0-only
+# SPDX-License-Identifier: GPL-3.0-only
 # Hollow Knight - Turkce Dil Paketi (kaldirma)
 set -u
 cd "$(dirname "$0")"

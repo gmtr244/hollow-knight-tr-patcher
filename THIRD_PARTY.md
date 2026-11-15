@@ -1,6 +1,6 @@
 # Üçüncü taraf bileşenler
 
-Bu projenin kendi kodu **GNU GPL v2 (GPL-2.0-only)** ile lisanslıdır. Aşağıdaki bileşenlerin MIT/PSF lisansları GPLv2 ile uyumludur.
+Bu projenin kendi kodu **GNU GPL v3 (GPL-3.0-only)** ile lisanslıdır. Aşağıdaki bileşenlerin MIT/PSF lisansları GPLv3 ile uyumludur.
 
 | Bileşen | Kullanım | Lisans |
 |---|---|---|

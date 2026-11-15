@@ -112,5 +112,5 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ## Lisans
 
-Kod: GNU GPL v2 (yalnızca v2, `GPL-2.0-only`; bkz. `LICENSE`, `THIRD_PARTY.md`). Hollow Knight ve oyun içeriği
+Kod: GNU GPL v3 (yalnızca v3, `GPL-3.0-only`; bkz. `LICENSE`, `THIRD_PARTY.md`). Hollow Knight ve oyun içeriği
 Team Cherry'ye aittir; bu depo oyun dosyası içermez.
