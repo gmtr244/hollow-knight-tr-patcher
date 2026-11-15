@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-"""Hollow Knight - TR dil paketi patcher.
-
-Kullanicinin KENDI oyun dosyalarini yamalar; telifli dosya dagitmaz.
-Yalnizca TR metin bloklarini (tr-veri/*.b64) ve yamalama mantigini tasir.
-
-  python3 hk-tr-patch.py "<oyun klasoru>"            # yamala
-  python3 hk-tr-patch.py "<oyun klasoru>" --dry-run  # sadece kontrol
-  python3 hk-tr-patch.py "<oyun klasoru>" --geri-al  # orijinale don
-"""
 import argparse
 import glob
 import hashlib
@@ -31,15 +22,13 @@ VERI = os.path.join(BETIK, "tr-veri", "tr")
 YEDEK_AD = ".tr-dil-paketi-yedek"
 DOSYALAR = ("resources.assets", "globalgamemanagers")
 DLL_ANAHTAR = "Managed/Assembly-CSharp.dll"
-# Yamanin test edildigi Unity surumu (Hollow Knight 1.5.12620, Steam).
-# Baska bir surumde yama uygulanmaz; --zorla ile asilabilir (riski size aittir).
 DESTEKLENEN_UNITY = ("6000.0.61f1",)
 
 ON_EK = re.compile(r"^([A-Z]{2,5}(?:_[A-Z]{2,5})?)_(.+)$")
 
 
 def md5(yol):
-    h = hashlib.md5()  # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5 -- yalnizca dosya kimligi/degisiklik tespiti, guvenlik amacli degil
+    h = hashlib.md5()  # nosemgrep: python.lang.security.insecure-hash-algorithms-md5.insecure-hash-algorithm-md5
     with open(yol, "rb") as f:
         for parca in iter(lambda: f.read(1 << 20), b""):
             h.update(parca)
@@ -53,7 +42,6 @@ OYUN_ADLARI = {
 
 
 def oyun_acik():
-    """Sadece surec ADINA bakar; komut satiri argumanlari yanlis eslesmesin."""
     try:
         if os.name == "nt":
             cikti = subprocess.run(["tasklist", "/fo", "csv", "/nh"],
@@ -158,7 +146,6 @@ def kaynak_dosya(tablo, onekler, temel):
 
 
 def dogrula(veri, beklenen, tr_id, dosya_id):
-    """Yazilan dosyalari yeniden acip kontrol eder."""
     env = UnityPy.load(os.path.join(veri, "resources.assets"))
     bulunan = {}
     idler = set()
@@ -193,7 +180,6 @@ def dogrula(veri, beklenen, tr_id, dosya_id):
 
 
 def kapat(*envler):
-    """UnityPy dosya taniticilarini kapatir (Windows'da dosya degistirmek icin sart)."""
     for env in envler:
         try:
             env.file.reader.dispose()
@@ -217,16 +203,6 @@ def arac_yolu():
 
 
 def yedekle(yol, yedek_yol, yamali):
-    """Orijinal (TR icermeyen) dosyayi yedekler.
-
-    Kural dosyanin KENDISINE bakar, kayitlara degil:
-    - Dosyada TR yamasi varsa yedege ASLA yazilmaz (yedek orijinalin kalmali).
-      Yedek de yoksa uyari verilir: orijinal bu klasorde yok.
-    - Dosya yamali degilse ve yedek yoksa ya da yedekten farkliysa (Steam guncellemesi
-      sonrasi gibi) yedek yenilenir; boylece KALDIR eski surumun dosyalarini yeni
-      surumun ustune yazmaz.
-    Donus: yazdirilacak mesaj ya da None.
-    """
     var = os.path.exists(yedek_yol)
     if yamali:
         if var:
@@ -243,7 +219,6 @@ def yedekle(yol, yedek_yol, yamali):
 
 
 def dll_yamala(veri, yedek):
-    """SupportedLanguages enum'ina TR ekler. Arac yoksa uyari verip devam eder."""
     dll = os.path.join(veri, "Managed", "Assembly-CSharp.dll")
     if not os.path.isfile(dll):
         print("  ! Assembly-CSharp.dll bulunamadi; dil listesine TR eklenemedi.")
@@ -254,20 +229,18 @@ def dll_yamala(veri, yedek):
         return False
     if os.name != "nt" and not os.access(arac, os.X_OK):
         try:
-            os.chmod(arac, 0o755)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- calistirilabilir arac icin gerekli
+            os.chmod(arac, 0o755)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
         except OSError:
             pass
 
     yedek_dll = os.path.join(yedek, "Managed", "Assembly-CSharp.dll")
     on = subprocess.run([arac, "--check", dll], capture_output=True, text=True)
-    dll_yamali = on.returncode == 0          # DLL'de TR zaten var mi?
+    dll_yamali = on.returncode == 0
 
     cikti = dll + ".tr-yeni"
     r = subprocess.run([arac, dll, cikti], capture_output=True, text=True)
     print("  " + (r.stdout or r.stderr).strip().replace("\n", "\n  "))
     if r.returncode == 0 and not os.path.isfile(cikti):
-        # enumpatch "TR zaten var" dedi ve cikti yazmadi: DLL onceden yamali.
-        # Basari saymadan once gercekten TR iceriyor mu diye dogrula.
         k = subprocess.run([arac, "--check", dll], capture_output=True, text=True)
         if k.returncode == 0:
             mesaj = yedekle(dll, yedek_dll, True)
@@ -278,7 +251,7 @@ def dll_yamala(veri, yedek):
         return False
     if r.returncode != 0 or not os.path.isfile(cikti):
         if os.path.isfile(cikti):
-            os.remove(cikti)          # yarim kalan (bos) ciktiyi oyun klasorunde birakma
+            os.remove(cikti)
         print("  ! DLL yamasi basarisiz; eski DLL korundu.")
         return False
     k = subprocess.run([arac, "--check", cikti], capture_output=True, text=True)
@@ -352,7 +325,6 @@ def tr_uygula(veri, dry_run, zorla=False):
     if eksik:
         print(f"  i TR verisi olmayan tablo ({len(eksik)}): {eksik[:5]}")
 
-    # 1) font yedegi
     font, fontlar = font_sec(env)
     font_adi = None
     if font is None:
@@ -373,7 +345,6 @@ def tr_uygula(veri, dry_run, zorla=False):
             if not dry_run:
                 obj.save_typetree(t)
 
-    # 2) TR tablolari
     mevcut = {}
     for obj in env.objects:
         if obj.type.name == "TextAsset" and (obj.peek_name() or "").startswith("TR_"):
@@ -422,13 +393,12 @@ def tr_uygula(veri, dry_run, zorla=False):
     gecici = tempfile.mkdtemp(prefix="hk-tr-")
     env.save(out_path=gecici)
 
-    # 3) globalgamemanagers indeksi
     genv = UnityPy.load(kaynak_ggm)
     gdosya = genv.file
     dosya_id = None
     for i, ext in enumerate(gdosya.externals):
         if os.path.basename(str(ext.path)).lower() == "resources.assets":
-            dosya_id = i + 1          # m_FileID 0 = bu dosya
+            dosya_id = i + 1
             break
     if dosya_id is None:
         raise SystemExit("HATA: globalgamemanagers icinde resources.assets referansi yok.")
@@ -465,7 +435,6 @@ def tr_uygula(veri, dry_run, zorla=False):
     print(f"indeks: {eklenen} eklendi, {silinen} eski kayit temizlendi")
     genv.save(out_path=gecici)
 
-    # 4) gecici kopyayi dogrula
     sorunlar = dogrula(gecici, {k: v for k, v in bloklar.items() if k in tr_id}, tr_id, dosya_id)
     if sorunlar:
         shutil.rmtree(gecici, ignore_errors=True)
@@ -473,7 +442,6 @@ def tr_uygula(veri, dry_run, zorla=False):
     kapat(env, genv)
     print("dogrulama: gecti")
 
-    # 5) yedek + atomik yaz
     yedek = os.path.join(veri, YEDEK_AD)
     os.makedirs(yedek, exist_ok=True)
     yamali_mi = {"resources.assets": bool(mevcut), "globalgamemanagers": ggm_yamali}
@@ -481,15 +449,13 @@ def tr_uygula(veri, dry_run, zorla=False):
         mesaj = yedekle(os.path.join(veri, ad), os.path.join(yedek, ad), yamali_mi[ad])
         if mesaj:
             print(f"  {mesaj}: {ad}")
-    # Yazmadan once mevcut dosyalarin gecici kopyasi: yazma yarida kesilirse dosyalar
-    # YEDEGE degil, bu kurulumdan onceki durumlarina dondurulur (yamali kurulumda da dogru).
     once = tempfile.mkdtemp(prefix="hk-tr-once-")
     yazilan = []
     try:
         for ad in DOSYALAR:
             shutil.copy2(os.path.join(veri, ad), os.path.join(once, ad))
         for ad in DOSYALAR:
-            yazilan.append(ad)          # yazmadan ONCE listeye al: yarida kesilse de geri alinsin
+            yazilan.append(ad)
             atomik_yaz(os.path.join(gecici, ad), os.path.join(veri, ad))
             print(f"  yazildi: {ad}  ({os.path.getsize(os.path.join(veri, ad))} bayt)")
     except BaseException:
@@ -555,7 +521,7 @@ def geri_al(veri):
         arac = arac_yolu()
         if arac and os.name != "nt" and not os.access(arac, os.X_OK):
             try:
-                os.chmod(arac, 0o755)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- calistirilabilir arac icin gerekli
+                os.chmod(arac, 0o755)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
             except OSError:
                 pass
         if arac:
@@ -598,7 +564,7 @@ def main():
         geri_al(veri)
     else:
         if tr_uygula(veri, a.dry_run, a.zorla) is False:
-            return 2   # TR metinleri yazildi ama dil listesi yamalanamadi
+            return 2
     return 0
 
 

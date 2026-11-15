@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 using Mono.Cecil;
 
-// GlobalEnums.SupportedLanguages enum'ina dil kodu ekler / kaldirir.
-//   enumpatch <giris.dll> <cikis.dll> [KOD]     -> ekle (yoksa)
-//   enumpatch --kaldir <giris.dll> <cikis.dll> [KOD]
-//   enumpatch --check <dll> [KOD]
 
 if (args.Length < 2)
 {
