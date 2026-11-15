@@ -1,0 +1,10 @@
+# derleme çıktıları ve ikili dosyalar (release'e yüklenir, repoya girmez)
+enumpatch/enumpatch
+enumpatch/enumpatch.exe
+enumpatch/bin/
+enumpatch/obj/
+enumpatch/pub-*/
+.venv/
+__pycache__/
+*.zip
+.env
