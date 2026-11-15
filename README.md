@@ -6,9 +6,10 @@ Bu paket oyuna ayrı bir "TR" (Türkçe) dil seçeneği ekler.
 ÖNEMLİ: Bu paket oyun dosyası İÇERMEZ. Kendi Hollow Knight
 kopyanızı yamalar. Çeviri metinleri pakete dahildir.
 
-Gereken: Hollow Knight 1.5.12620 (Steam) — Windows veya Linux
-(Steam / Proton). Başka sürümlerde betik hiçbir şeyi değiştirmeden
-durur.
+Gereken: Hollow Knight 1.5.12620 (Steam, Unity 6000.0.61f1) —
+Windows veya Linux (Steam / Proton). Betik oyunun Unity sürümünü
+kontrol eder; farklı bir sürümde hiçbir şeyi değiştirmeden durur.
+(Yine de denemek isterseniz betiğe --zorla ekleyin; risk size aittir.)
 
 --------------------------------------------------------------------
 WINDOWS
@@ -45,12 +46,14 @@ NE YAPIYOR?
 4. Assembly-CSharp.dll içindeki dil listesine "TR" kodunu ekler.
 
 Yapmadan önce:
-- Oyunun açık olup olmadığını kontrol eder.
+- Oyunun açık olup olmadığını ve Unity sürümünü kontrol eder.
 - Dosya yapısını (dil tabloları, kaynak indeksi, font, dil listesi)
   doğrular; tanımadığı bir yapıda hiçbir şeyi değiştirmez.
 - Değişiklikleri geçici dosyaya yazıp tekrar açarak doğrular;
   ancak doğrulama geçerse yerine koyar.
 - Orijinalleri hollow_knight_Data/.tr-dil-paketi-yedek/ altına alır.
+  Oyun sonradan güncellenmişse (dosyalar değişmişse) yedeği yeniler;
+  böylece KALDIR eski sürümün dosyalarını yeni sürümün üstüne yazmaz.
 
 --------------------------------------------------------------------
 NOTLAR
@@ -77,7 +80,7 @@ enumpatch/enumpatch[.exe] ... dil listesi aracı (Mono.Cecil)
 python/ ..................... Windows için gömülü Python (Windows sürümü)
 
 Çeviri topluluk çevirisidir; Hollow Knight ve dosya biçimleri
-Team Cherry'ye aittir. Bu paket yalnızca kişisel kullanım içindir.
+Team Cherry'ye aittir.
 
 ## Depo yapısı
 

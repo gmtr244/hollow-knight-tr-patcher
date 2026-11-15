@@ -30,6 +30,10 @@ BETIK = os.path.dirname(os.path.abspath(__file__))
 VERI = os.path.join(BETIK, "tr-veri", "tr")
 YEDEK_AD = ".tr-dil-paketi-yedek"
 DOSYALAR = ("resources.assets", "globalgamemanagers")
+DLL_ANAHTAR = "Managed/Assembly-CSharp.dll"
+# Yamanin test edildigi Unity surumu (Hollow Knight 1.5.12620, Steam).
+# Baska bir surumde yama uygulanmaz; --zorla ile asilabilir (riski size aittir).
+DESTEKLENEN_UNITY = ("6000.0.61f1",)
 
 ON_EK = re.compile(r"^([A-Z]{2,5}(?:_[A-Z]{2,5})?)_(.+)$")
 
@@ -212,7 +216,39 @@ def arac_yolu():
     return None
 
 
-def dll_yamala(veri, yedek):
+def onceki_kayit(yedek):
+    """Onceki kurulumun yazdigi tr-yama.json icindeki md5 kayitlari (yoksa bos)."""
+    try:
+        with open(os.path.join(yedek, "tr-yama.json"), encoding="utf-8") as fh:
+            m = json.load(fh).get("md5", {})
+        return m if isinstance(m, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def yedekle(yol, yedek_yol, yamali_md5):
+    """Orijinal dosyayi yedekler.
+
+    Yedek yoksa alinir. Yedek varsa, dosya ne bizim yamali halimiz ne de yedegin
+    kendisi ise (Steam guncellemesi/dogrulamasi sonrasi gibi) yedek bayattir:
+    yenilenir; boylece KALDIR eski surumun dosyalarini yeni surumun ustune yazmaz.
+    Onceki kayit yoksa (eski kurulum) yedege dokunulmaz.
+    Donus: yazdirilacak mesaj ya da None.
+    """
+    if not os.path.exists(yedek_yol):
+        os.makedirs(os.path.dirname(yedek_yol), exist_ok=True)
+        shutil.copy2(yol, yedek_yol)
+        return "yedeklendi"
+    if yamali_md5 is None:
+        return None
+    simdiki = md5(yol)
+    if simdiki == yamali_md5 or simdiki == md5(yedek_yol):
+        return None
+    shutil.copy2(yol, yedek_yol)
+    return "yedek yenilendi (oyun dosyasi degismis)"
+
+
+def dll_yamala(veri, yedek, onceki):
     """SupportedLanguages enum'ina TR ekler. Arac yoksa uyari verip devam eder."""
     dll = os.path.join(veri, "Managed", "Assembly-CSharp.dll")
     if not os.path.isfile(dll):
@@ -231,7 +267,17 @@ def dll_yamala(veri, yedek):
     cikti = dll + ".tr-yeni"
     r = subprocess.run([arac, dll, cikti], capture_output=True, text=True)
     print("  " + (r.stdout or r.stderr).strip().replace("\n", "\n  "))
+    if r.returncode == 0 and not os.path.isfile(cikti):
+        # enumpatch "TR zaten var" dedi ve cikti yazmadi: DLL onceden yamali.
+        # Basari saymadan once gercekten TR iceriyor mu diye dogrula.
+        k = subprocess.run([arac, "--check", dll], capture_output=True, text=True)
+        if k.returncode == 0:
+            return True
+        print("  ! DLL'de TR dil kodu dogrulanamadi.")
+        return False
     if r.returncode != 0 or not os.path.isfile(cikti):
+        if os.path.isfile(cikti):
+            os.remove(cikti)          # yarim kalan (bos) ciktiyi oyun klasorunde birakma
         print("  ! DLL yamasi basarisiz; eski DLL korundu.")
         return False
     k = subprocess.run([arac, "--check", cikti], capture_output=True, text=True)
@@ -239,11 +285,10 @@ def dll_yamala(veri, yedek):
         os.remove(cikti)
         print("  ! DLL dogrulanamadi; eski DLL korundu.")
         return False
-    os.makedirs(os.path.join(yedek, "Managed"), exist_ok=True)
     yedek_dll = os.path.join(yedek, "Managed", "Assembly-CSharp.dll")
-    if not os.path.exists(yedek_dll):
-        shutil.copy2(dll, yedek_dll)
-        print("  yedeklendi: Managed/Assembly-CSharp.dll")
+    mesaj = yedekle(dll, yedek_dll, onceki.get(DLL_ANAHTAR))
+    if mesaj:
+        print(f"  {mesaj}: {DLL_ANAHTAR}")
     if not yeniden_adlandir(cikti, dll):
         os.remove(cikti)
         print("  ! DLL degistirilemedi (dosya kilitli); eski DLL korundu.")
@@ -270,7 +315,7 @@ def atomik_yaz(kaynak, hedef):
         raise SystemExit(f"HATA: dosya degistirilemedi (baska program kullaniyor olabilir): {hedef}")
 
 
-def tr_uygula(veri, dry_run):
+def tr_uygula(veri, dry_run, zorla=False):
     kaynak_assets = os.path.join(veri, "resources.assets")
     kaynak_ggm = os.path.join(veri, "globalgamemanagers")
     for yol in (kaynak_assets, kaynak_ggm):
@@ -291,6 +336,13 @@ def tr_uygula(veri, dry_run):
     f = env.file
     surum = getattr(f, "unity_version", None) or getattr(f, "version", "?")
     print(f"Unity surumu: {surum}")
+    if str(surum).strip() not in DESTEKLENEN_UNITY:
+        if not zorla:
+            raise SystemExit(
+                f"HATA: desteklenmeyen Unity surumu: {surum}\n"
+                f"     Yama yalnizca {', '.join(DESTEKLENEN_UNITY)} (Hollow Knight 1.5.12620) icin test edildi.\n"
+                "     Hicbir dosya degistirilmedi. Yine de denemek icin --zorla kullanin (risk size aittir).")
+        print(f"  ! UYARI: desteklenmeyen Unity surumu ({surum}); --zorla ile devam ediliyor.")
 
     temel, tablolar, onekler = dil_tablolari(env)
     print(f"Kaynak dil oneki: {temel} ({len(tablolar)} tablo)")
@@ -422,28 +474,39 @@ def tr_uygula(veri, dry_run):
     # 5) yedek + atomik yaz
     yedek = os.path.join(veri, YEDEK_AD)
     os.makedirs(yedek, exist_ok=True)
+    onceki = onceki_kayit(yedek)
     for ad in DOSYALAR:
-        if not os.path.exists(os.path.join(yedek, ad)):
-            shutil.copy2(os.path.join(veri, ad), os.path.join(yedek, ad))
-            print(f"  yedeklendi: {ad}")
+        mesaj = yedekle(os.path.join(veri, ad), os.path.join(yedek, ad), onceki.get(ad))
+        if mesaj:
+            print(f"  {mesaj}: {ad}")
     for ad in DOSYALAR:
         atomik_yaz(os.path.join(gecici, ad), os.path.join(veri, ad))
         print(f"  yazildi: {ad}  ({os.path.getsize(os.path.join(veri, ad))} bayt)")
 
-    dll_ok = dll_yamala(veri, yedek)
+    dll_ok = dll_yamala(veri, yedek, onceki)
 
-    json.dump({
-        "surum": 1,
-        "dll": dll_ok,
-        "tablolar": sorted(tr_id),
-        "m_FileID": dosya_id,
-        "font": font_adi,
-        "unity": str(surum),
-        "md5": {ad: md5(os.path.join(veri, ad)) for ad in DOSYALAR},
-    }, open(os.path.join(yedek, "tr-yama.json"), "w", encoding="utf-8"),
-        ensure_ascii=False, indent=1)
+    md5ler = {ad: md5(os.path.join(veri, ad)) for ad in DOSYALAR}
+    if dll_ok:
+        md5ler[DLL_ANAHTAR] = md5(os.path.join(veri, "Managed", "Assembly-CSharp.dll"))
+    with open(os.path.join(yedek, "tr-yama.json"), "w", encoding="utf-8") as fh:
+        json.dump({
+            "surum": 1,
+            "dll": dll_ok,
+            "tablolar": sorted(tr_id),
+            "m_FileID": dosya_id,
+            "font": font_adi,
+            "unity": str(surum),
+            "md5": md5ler,
+        }, fh, ensure_ascii=False, indent=1)
     shutil.rmtree(gecici, ignore_errors=True)
-    print("\nTAMAM. Oyunu acin -> SECENEKLER -> dil listesinde 'TR'.")
+    if dll_ok:
+        print("\nTAMAM. Oyunu acin -> SECENEKLER -> dil listesinde 'TR'.")
+    else:
+        print("\nUYARI: Metin tablolari yazildi, ama dil listesine 'TR' EKLENEMEDI")
+        print("(Assembly-CSharp.dll yamalanamadi; yukaridaki hata mesajina bakin).")
+        print("Oyunda TR secenegi gorunmeyebilir. KUR'u tekrar calistirabilir ya da")
+        print("KALDIR ile her seyi geri alabilirsiniz.")
+    return dll_ok
 
 
 def geri_al(veri):
@@ -489,6 +552,8 @@ def main():
     ap.add_argument("oyun", nargs="?", help="oyun klasoru veya hollow_knight_Data")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--geri-al", action="store_true")
+    ap.add_argument("--zorla", action="store_true",
+                    help="desteklenmeyen Unity surumunde de dene (risk size aittir)")
     a = ap.parse_args()
 
     if a.oyun:
@@ -503,7 +568,8 @@ def main():
     if a.geri_al:
         geri_al(veri)
     else:
-        tr_uygula(veri, a.dry_run)
+        if tr_uygula(veri, a.dry_run, a.zorla) is False:
+            return 2   # TR metinleri yazildi ama dil listesi yamalanamadi
     return 0
 
 
