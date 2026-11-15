@@ -481,27 +481,29 @@ def tr_uygula(veri, dry_run, zorla=False):
         mesaj = yedekle(os.path.join(veri, ad), os.path.join(yedek, ad), yamali_mi[ad])
         if mesaj:
             print(f"  {mesaj}: {ad}")
+    # Yazmadan once mevcut dosyalarin gecici kopyasi: yazma yarida kesilirse dosyalar
+    # YEDEGE degil, bu kurulumdan onceki durumlarina dondurulur (yamali kurulumda da dogru).
+    once = tempfile.mkdtemp(prefix="hk-tr-once-")
     yazilan = []
     try:
         for ad in DOSYALAR:
+            shutil.copy2(os.path.join(veri, ad), os.path.join(once, ad))
+        for ad in DOSYALAR:
+            yazilan.append(ad)          # yazmadan ONCE listeye al: yarida kesilse de geri alinsin
             atomik_yaz(os.path.join(gecici, ad), os.path.join(veri, ad))
-            yazilan.append(ad)
             print(f"  yazildi: {ad}  ({os.path.getsize(os.path.join(veri, ad))} bayt)")
     except BaseException:
-        # yarim kalan yazma: iki dosya birbiriyle uyumsuz kalmasin, yedekten geri al
-        print("HATA: yazma sirasinda sorun; yazilan dosyalar yedekten geri aliniyor...")
+        print("HATA: yazma sirasinda sorun; dosyalar onceki durumuna donduruluyor...")
         for ad in yazilan:
-            kaynak = os.path.join(yedek, ad)
             try:
-                if os.path.isfile(kaynak):
-                    atomik_yaz(kaynak, os.path.join(veri, ad))
-                    print(f"  geri alindi: {ad}")
-                else:
-                    print(f"  ! yedek yok, geri alinamadi: {ad} (KALDIR'i deneyin)")
+                atomik_yaz(os.path.join(once, ad), os.path.join(veri, ad))
+                print(f"  geri alindi: {ad}")
             except BaseException:
-                print(f"  ! geri alinamadi: {ad} (KALDIR'i deneyin)")
+                print(f"  ! geri alinamadi: {ad} -- KALDIR'i calistirin ya da KUR'u tekrar deneyin")
+        shutil.rmtree(once, ignore_errors=True)
         shutil.rmtree(gecici, ignore_errors=True)
         raise
+    shutil.rmtree(once, ignore_errors=True)
 
     dll_ok = dll_yamala(veri, yedek)
 
@@ -535,10 +537,12 @@ def geri_al(veri):
         raise SystemExit(f"HATA: yedek yok: {yedek}")
     if oyun_acik():
         raise SystemExit("HATA: oyun acik. Once Hollow Knight'i kapatin.")
+    atlanan = []
     for ad in DOSYALAR:
         kaynak = os.path.join(yedek, ad)
         if not os.path.isfile(kaynak):
             print(f"  ! yedek yok, atlandi: {ad}")
+            atlanan.append(ad)
             continue
         atomik_yaz(kaynak, os.path.join(veri, ad))
         print(f"  geri yuklendi: {ad}  md5 {md5(os.path.join(veri, ad))}")
@@ -562,7 +566,12 @@ def geri_al(veri):
                 os.remove(cikti)
                 print("  TR dil kodu DLL'den kaldirildi")
 
-    print("\nOrijinal dosyalar geri yuklendi.")
+    if atlanan:
+        print("\nUYARI: su dosyalar geri YUKLENEMEDI (yedek yok): " + ", ".join(atlanan))
+        print("Bu dosyalarda TR yamasi duruyor olabilir. Steam'de 'Oyun dosyalarinin")
+        print("butunlugunu dogrula' ile orijinallerine dondurebilirsiniz.")
+    else:
+        print("\nOrijinal dosyalar geri yuklendi.")
     print("NOT: Dil ayariniz TR kayitliysa, oyunu acmadan once ayarlardan EN secin")
     print("     veya dil ayarini sifirlayin; aksi halde secili dil bulunamaz.")
 
