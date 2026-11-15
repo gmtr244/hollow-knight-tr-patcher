@@ -78,4 +78,5 @@ enumpatch/enumpatch[.exe] ... dil listesi aracı (Mono.Cecil)
 python/ ..................... Windows için gömülü Python (Windows sürümü)
 
 Çeviri topluluk çevirisidir; Hollow Knight ve dosya biçimleri
-Team Cherry'ye aittir. Bu paket yalnızca kişisel kullanım içindir.
+Team Cherry'ye aittir. Kaynak kod GNU GPL v3 (GPL-3.0-only) ile lisanslıdır: LICENSE dosyasına bakın.
+Kaynak: https://github.com/gmtr244/hollow-knight-tr-patcher
